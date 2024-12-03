@@ -1,70 +1,258 @@
-# Getting Started with Create React App
+import React, { useState, useEffect, useCallback } from "react";
+import {
+LineChart,
+Line,
+XAxis,
+YAxis,
+CartesianGrid,
+Tooltip,
+Legend,
+BarChart,
+Bar,
+} from "recharts";
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+// Function to decode the base64 image (if present)
+const decodeBase64Image = (base64Image) => {
+const imageData = base64Image.split(",")[1]; // Extract the base64 data from the prefix
+return imageData; // This could be expanded to actually render the image in some cases
+};
 
-## Available Scripts
+const parseLogEntry = (logEntry, incrementMalformedCount, storeErrorLog, updateErrorCounts) => {
+if (!logEntry.trim()) {
+return null;
+}
 
-In the project directory, you can run:
+try {
+const logPattern =
+/([\d\-T:.]+)\suser=([a-zA-Z0-9_]+)\sip=([0-9.]+)\saction=([a-zA-Z0-9_]+)/;
 
-### `npm start`
+    const match = logEntry.match(logPattern);
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+    if (match) {
+      const timestamp = match[1];
+      const user = match[2];
+      const ip = match[3];
+      const action = match[4];
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+      return {
+        type: "json",
+        timestamp,
+        user,
+        ip,
+        event: action,
+        details: null,
+        image: null,
+      };
+    }
 
-### `npm test`
+    if (logEntry.includes("NullPointerException")) {
+      const timestampMatch = logEntry.match(
+        /NullPointerException\s+at\s+line\s+(\d+)\s+([\d\-T:.]+)/
+      );
+      if (timestampMatch) {
+        const timestamp = timestampMatch[2];
+        const message = "NullPointerException at line " + timestampMatch[1];
+        storeErrorLog({ timestamp, message, type: "NullPointerException" });
+        updateErrorCounts("NullPointerException");
+        return { type: "null_pointer_exception", timestamp, message };
+      }
+    }
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+    if (logEntry.includes("TimeoutError: Connection to DB failed")) {
+      const timestampMatch = logEntry.match(
+        /TimeoutError: Connection to DB failed\s(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+)/
+      );
+      if (timestampMatch) {
+        const timestamp = timestampMatch[1];
+        const message = "TimeoutError: Connection to DB failed";
+        storeErrorLog({ timestamp, message, type: "TimeoutError" });
+        updateErrorCounts("TimeoutError");
+        return { type: "timeout_error", timestamp, message };
+      }
+    }
 
-### `npm run build`
+    if (logEntry.includes("KeyError: 'action_type'")) {
+      const timestampMatch = logEntry.match(
+        /KeyError: 'action_type'\s(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+)/
+      );
+      if (timestampMatch) {
+        const timestamp = timestampMatch[1];
+        const message = "KeyError: 'action_type'";
+        storeErrorLog({ timestamp, message, type: "KeyError" });
+        updateErrorCounts("KeyError");
+        return { type: "key_error", timestamp, message };
+      }
+    }
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+    // Handle additional error types similarly...
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+    // Return null for malformed logs
+    return null;
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+} catch (error) {
+return {
+type: "parse_error",
+originalLog: logEntry,
+error: error.message,
+};
+}
+};
 
-### `npm run eject`
+const IoTLogParser = () => {
+const [parsedLogs, setParsedLogs] = useState([]);
+const [errorLogs, setErrorLogs] = useState([]);
+const [performanceMetrics, setPerformanceMetrics] = useState({
+processingTime: 0,
+totalLogs: 0,
+successfulParse: 0,
+failedParse: 0,
+});
+const [malformedLogCount, setMalformedLogCount] = useState(0);
+const [errorList, setErrorList] = useState([]);
+const [errorCounts, setErrorCounts] = useState({
+TimeoutError: 0,
+NullPointerException: 0,
+KeyError: 0,
+IndexOutOfBoundsException: 0,
+InvalidBase64: 0,
+MalformedJSON: 0,
+});
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+const incrementMalformedCount = useCallback(() => {
+setMalformedLogCount((prevCount) => prevCount + 1);
+}, []);
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+const storeErrorLog = useCallback((error) => {
+setErrorList((prevErrors) => [...prevErrors, error]);
+}, []);
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+const updateErrorCounts = (errorType) => {
+setErrorCounts((prevCounts) => ({
+...prevCounts,
+[errorType]: prevCounts[errorType] + 1,
+}));
+};
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+const readLogFile = async (file) => {
+const fileText = await file.text();
+const logArray = fileText.split("\n");
+parseLogs(logArray);
+};
 
-## Learn More
+const parseLogs = (logArray) => {
+const startTime = performance.now();
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+    const parsed = [];
+    const errors = [];
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+    logArray.forEach((log) => {
+      const parsedEntry = parseLogEntry(
+        log,
+        incrementMalformedCount,
+        storeErrorLog,
+        updateErrorCounts
+      );
+      if (parsedEntry) {
+        if (
+          parsedEntry.type === "error" ||
+          parsedEntry.type === "parse_error"
+        ) {
+          errors.push(parsedEntry);
+        } else {
+          parsed.push(parsedEntry);
+        }
+      }
+    });
 
-### Code Splitting
+    const endTime = performance.now();
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+    setParsedLogs(parsed);
+    setErrorLogs(errors);
+    setPerformanceMetrics({
+      processingTime: endTime - startTime,
+      totalLogs: logArray.length,
+      successfulParse: parsed.length,
+      failedParse: errors.length,
+    });
 
-### Analyzing the Bundle Size
+};
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+return (
+<div className="p-4 bg-gray-100">
+<h1 className="text-2xl font-bold mb-4">IoT Log Parser Dashboard</h1>
 
-### Making a Progressive Web App
+      {/* Performance Metrics */}
+      <div className="grid grid-cols-2 gap-4 mb-4">
+        <div className="bg-white p-4 rounded shadow">
+          <h2 className="font-bold">Performance Metrics</h2>
+          <p>
+            Processing Time: {performanceMetrics.processingTime.toFixed(2)} ms
+          </p>
+          <p>Total Logs: {performanceMetrics.totalLogs}</p>
+          <p>Successful Parse: {performanceMetrics.successfulParse}</p>
+          <p>Failed Parse: {performanceMetrics.failedParse}</p>
+        </div>
+      </div>
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+      {/* Log File Input */}
+      <div className="bg-white p-4 rounded shadow mb-4">
+        <h2 className="font-bold mb-2">Upload Log File</h2>
+        <input
+          type="file"
+          accept=".log"
+          onChange={(e) => {
+            const file = e.target.files[0];
+            if (file) {
+              readLogFile(file);
+            }
+          }}
+        />
+      </div>
 
-### Advanced Configuration
+      {/* Malformed Log Count */}
+      <div className="bg-white p-4 rounded shadow mb-4">
+        <h2 className="font-bold mb-2">Malformed Log Entries</h2>
+        <p>Total Malformed Logs: {malformedLogCount}</p>
+      </div>
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+      {/* Error Count Chart */}
+      <div className="bg-white p-4 rounded shadow mb-4">
+        <h2 className="font-bold mb-2">Error Types</h2>
+        <BarChart width={600} height={300} data={Object.entries(errorCounts).map(([type, count]) => ({ type, count }))}>
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis dataKey="type" />
+          <YAxis />
+          <Tooltip />
+          <Legend />
+          <Bar dataKey="count" fill="#8884d8" />
+        </BarChart>
+      </div>
 
-### Deployment
+      {/* Error Logs Table */}
+      <div className="bg-white p-4 rounded shadow mb-4">
+        <h2 className="font-bold mb-2">Error Logs</h2>
+        <table className="w-full border-collapse">
+          <thead>
+            <tr className="bg-gray-200">
+              <th className="border p-2">Timestamp</th>
+              <th className="border p-2">Error Type</th>
+              <th className="border p-2">Message</th>
+            </tr>
+          </thead>
+          <tbody>
+            {errorList.map((error, index) => (
+              <tr key={index} className="hover:bg-gray-100">
+                <td className="border p-2">{error.timestamp}</td>
+                <td className="border p-2">{error.type}</td>
+                <td className="border p-2">{error.message}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+);
+};
 
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+export default IoTLogParser;

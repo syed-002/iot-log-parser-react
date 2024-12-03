@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+
 import {
   LineChart,
   Line,
@@ -7,6 +8,8 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
+  BarChart,
+  Bar,
 } from "recharts";
 
 // Function to decode the base64 image (if present)
@@ -15,7 +18,12 @@ const decodeBase64Image = (base64Image) => {
   return imageData; // This could be expanded to actually render the image in some cases
 };
 
-const parseLogEntry = (logEntry, incrementMalformedCount, storeErrorLog) => {
+const parseLogEntry = (
+  logEntry,
+  incrementMalformedCount,
+  storeErrorLog,
+  updateErrorCounts
+) => {
   if (!logEntry.trim()) {
     // Skip empty or whitespace-only lines
     return null;
@@ -56,7 +64,8 @@ const parseLogEntry = (logEntry, incrementMalformedCount, storeErrorLog) => {
 
       if (timestampMatch) {
         const timestamp = timestampMatch[2];
-        const message = "NullPointerException at line " + timestampMatch[1];
+        updateErrorCounts("NullPointerException");
+        const message = "NullPointerException at line 42" + timestampMatch[2];
         storeErrorLog({ timestamp, message, type: "NullPointerException" });
         return { type: "null_pointer_exception", timestamp, message };
       }
@@ -69,6 +78,7 @@ const parseLogEntry = (logEntry, incrementMalformedCount, storeErrorLog) => {
       );
 
       if (timestampMatch) {
+        updateErrorCounts("IndexOutOfBoundsException");
         const timestamp = timestampMatch[2];
         const message =
           "IndexOutOfBoundsException in module " + timestampMatch[1];
@@ -88,6 +98,8 @@ const parseLogEntry = (logEntry, incrementMalformedCount, storeErrorLog) => {
       );
 
       if (timestampMatch) {
+        updateErrorCounts("TimeoutError");
+
         const timestamp = timestampMatch[1];
         const message = "TimeoutError: Connection to DB failed";
         storeErrorLog({ timestamp, message, type: "TimeoutError" });
@@ -102,6 +114,8 @@ const parseLogEntry = (logEntry, incrementMalformedCount, storeErrorLog) => {
       );
 
       if (timestampMatch) {
+        updateErrorCounts("KeyError");
+
         const timestamp = timestampMatch[1];
         const message = "KeyError: 'action_type'";
         storeErrorLog({ timestamp, message, type: "KeyError" });
@@ -116,6 +130,8 @@ const parseLogEntry = (logEntry, incrementMalformedCount, storeErrorLog) => {
       );
 
       if (timestampMatch) {
+        updateErrorCounts("InvalidBase64");
+
         const timestamp = timestampMatch[2];
         const message = "InvalidBase64: " + timestampMatch[1];
         storeErrorLog({ timestamp, message, type: "InvalidBase64" });
@@ -130,6 +146,7 @@ const parseLogEntry = (logEntry, incrementMalformedCount, storeErrorLog) => {
       );
 
       if (timestampMatch) {
+        updateErrorCounts("MalformedJSON");
         const timestamp = timestampMatch[1];
         const message = "Malformed JSON object";
         storeErrorLog({ timestamp, message, type: "MalformedJSON" });
@@ -177,6 +194,14 @@ const parseLogEntry = (logEntry, incrementMalformedCount, storeErrorLog) => {
 
 const IoTLogParser = () => {
   const [parsedLogs, setParsedLogs] = useState([]);
+  const [errorCounts, setErrorCounts] = useState({
+    TimeoutError: 0,
+    NullPointerException: 0,
+    KeyError: 0,
+    IndexOutOfBoundsException: 0,
+    InvalidBase64: 0,
+    MalformedJSON: 0,
+  });
   const [errorLogs, setErrorLogs] = useState([]);
   const [performanceMetrics, setPerformanceMetrics] = useState({
     processingTime: 0,
@@ -191,6 +216,13 @@ const IoTLogParser = () => {
   const incrementMalformedCount = useCallback(() => {
     setMalformedLogCount((prevCount) => prevCount + 1);
   }, []);
+
+  const updateErrorCounts = (errorType) => {
+    setErrorCounts((prevCounts) => ({
+      ...prevCounts,
+      [errorType]: prevCounts[errorType] + 1,
+    }));
+  };
 
   // Callback function to store error logs
   const storeErrorLog = useCallback((error) => {
@@ -214,7 +246,8 @@ const IoTLogParser = () => {
       const parsedEntry = parseLogEntry(
         log,
         incrementMalformedCount,
-        storeErrorLog
+        storeErrorLog,
+        updateErrorCounts
       );
       if (parsedEntry) {
         // If parsed entry is an error type, add to error list
@@ -302,6 +335,26 @@ const IoTLogParser = () => {
               ))}
           </tbody>
         </table>
+      </div>
+
+      {/* Error Count Chart */}
+      <div className="bg-white p-4 rounded shadow mb-4">
+        <h2 className="font-bold mb-2">Error Types</h2>
+        <BarChart
+          width={600}
+          height={300}
+          data={Object.entries(errorCounts).map(([type, count]) => ({
+            type,
+            count,
+          }))}
+        >
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis dataKey="type" />
+          <YAxis />
+          <Tooltip />
+          <Legend />
+          <Bar dataKey="count" fill="#8884d8" />
+        </BarChart>
       </div>
 
       {/* Parsed Logs Table */}
