@@ -1,31 +1,34 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
-LineChart,
-Line,
-XAxis,
-YAxis,
-CartesianGrid,
-Tooltip,
-Legend,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
 } from "recharts";
 
 // Function to decode the base64 image (if present)
 const decodeBase64Image = (base64Image) => {
-const imageData = base64Image.split(",")[1]; // Extract the base64 data from the prefix
-return imageData; // This could be expanded to actually render the image in some cases
+  const imageData = base64Image.split(",")[1]; // Extract the base64 data from the prefix
+  return imageData; // This could be expanded to actually render the image in some cases
 };
 
 const parseLogEntry = (logEntry, incrementMalformedCount, storeErrorLog) => {
-if (!logEntry.trim()) {
-// Skip empty or whitespace-only lines
-return null;
-}
+  if (!logEntry.trim()) {
+    // Skip empty or whitespace-only lines
+    return null;
+  }
 
-try {
-// Handle the specific log format (tc: "2024-12-01T14:29:09.181812 user=user*502 ip=141.11.96.144 action=START")
-const logPattern =
-/tc:\s"([\d\-T:.]+)\suser=([a-zA-Z0-9*]+)\sip=([0-9.]+)\saction=([a-zA-Z0-9_]+)"/;
-const match = logEntry.match(logPattern);
+  try {
+    // Handle the specific log format (tc: "2024-12-01T14:29:09.181812 user=user_502 ip=141.11.96.144 action=START")
+    // const logPattern =
+    //   /tc:\s"([\d\-T:.]+)\suser=([a-zA-Z0-9_]+)\sip=([0-9.]+)\saction=([a-zA-Z0-9_]+)"/;
+    const logPattern =
+      /([\d\-T:.]+)\suser=([a-zA-Z0-9_]+)\sip=([0-9.]+)\saction=([a-zA-Z0-9_]+)/;
+
+    const match = logEntry.match(logPattern);
 
     if (match) {
       const timestamp = match[1];
@@ -33,12 +36,15 @@ const match = logEntry.match(logPattern);
       const ip = match[3];
       const action = match[4];
 
+      // Return in JSON-like structure
       return {
-        type: "log_entry",
+        type: "json", // Type set to "json" to follow the same structure as JSON-based logs
         timestamp,
         user,
         ip,
-        action,
+        event: action, // Treat action as the event
+        details: null, // Add more fields as needed
+        image: null, // Handle image if needed later
       };
     }
 
@@ -151,56 +157,55 @@ const match = logEntry.match(logPattern);
     }
 
     // General error handling for unknown errors
-    if (logEntry.includes("ERROR")) {
-      return {
-        type: "error",
-        message: logEntry,
-      };
-    }
+    // if (logEntry.includes("ERROR")) {
+    //   return {
+    //     type: "error",
+    //     message: logEntry,
+    //   };
+    // }
 
     // Return null for malformed logs
     return null;
-
-} catch (error) {
-return {
-type: "parse_error",
-originalLog: logEntry,
-error: error.message,
-};
-}
+  } catch (error) {
+    return {
+      type: "parse_error",
+      originalLog: logEntry,
+      error: error.message,
+    };
+  }
 };
 
 const IoTLogParser = () => {
-const [parsedLogs, setParsedLogs] = useState([]);
-const [errorLogs, setErrorLogs] = useState([]);
-const [performanceMetrics, setPerformanceMetrics] = useState({
-processingTime: 0,
-totalLogs: 0,
-successfulParse: 0,
-failedParse: 0,
-});
-const [malformedLogCount, setMalformedLogCount] = useState(0); // State to track malformed logs
-const [errorList, setErrorList] = useState([]); // State to store all errors with timestamp
+  const [parsedLogs, setParsedLogs] = useState([]);
+  const [errorLogs, setErrorLogs] = useState([]);
+  const [performanceMetrics, setPerformanceMetrics] = useState({
+    processingTime: 0,
+    totalLogs: 0,
+    successfulParse: 0,
+    failedParse: 0,
+  });
+  const [malformedLogCount, setMalformedLogCount] = useState(0); // State to track malformed logs
+  const [errorList, setErrorList] = useState([]); // State to store all errors with timestamp
 
-// Callback function to increment malformed log count
-const incrementMalformedCount = useCallback(() => {
-setMalformedLogCount((prevCount) => prevCount + 1);
-}, []);
+  // Callback function to increment malformed log count
+  const incrementMalformedCount = useCallback(() => {
+    setMalformedLogCount((prevCount) => prevCount + 1);
+  }, []);
 
-// Callback function to store error logs
-const storeErrorLog = useCallback((error) => {
-setErrorList((prevErrors) => [...prevErrors, error]);
-}, []);
+  // Callback function to store error logs
+  const storeErrorLog = useCallback((error) => {
+    setErrorList((prevErrors) => [...prevErrors, error]);
+  }, []);
 
-// Read logs from a file (this part assumes logs will be uploaded)
-const readLogFile = async (file) => {
-const fileText = await file.text();
-const logArray = fileText.split("\n");
-parseLogs(logArray);
-};
+  // Read logs from a file (this part assumes logs will be uploaded)
+  const readLogFile = async (file) => {
+    const fileText = await file.text();
+    const logArray = fileText.split("\n");
+    parseLogs(logArray);
+  };
 
-const parseLogs = (logArray) => {
-const startTime = performance.now();
+  const parseLogs = (logArray) => {
+    const startTime = performance.now();
 
     const parsed = [];
     const errors = [];
@@ -212,12 +217,15 @@ const startTime = performance.now();
         storeErrorLog
       );
       if (parsedEntry) {
-        parsed.push(parsedEntry);
+        // If parsed entry is an error type, add to error list
         if (
           parsedEntry.type === "error" ||
           parsedEntry.type === "parse_error"
         ) {
           errors.push(parsedEntry);
+        } else {
+          console.log(parsedEntry);
+          parsed.push(parsedEntry); // Add non-error logs to parsed
         }
       }
     });
@@ -232,12 +240,11 @@ const startTime = performance.now();
       successfulParse: parsed.length,
       failedParse: errors.length,
     });
+  };
 
-};
-
-return (
-<div className="p-4 bg-gray-100">
-<h1 className="text-2xl font-bold mb-4">IoT Log Parser Dashboard</h1>
+  return (
+    <div className="p-4 bg-gray-100">
+      <h1 className="text-2xl font-bold mb-4">IoT Log Parser Dashboard</h1>
 
       {/* Performance Metrics */}
       <div className="grid grid-cols-2 gap-4 mb-4">
@@ -273,7 +280,6 @@ return (
         <p>Total Malformed Logs: {malformedLogCount}</p>
       </div>
 
-      {/* Error Logs Table */}
       <div className="bg-white p-4 rounded shadow mb-4">
         <h2 className="font-bold mb-2">Error Logs</h2>
         <table className="w-full border-collapse">
@@ -285,13 +291,15 @@ return (
             </tr>
           </thead>
           <tbody>
-            {errorList.map((error, index) => (
-              <tr key={index} className="hover:bg-gray-100">
-                <td className="border p-2">{error.timestamp}</td>
-                <td className="border p-2">{error.type}</td>
-                <td className="border p-2">{error.message}</td>
-              </tr>
-            ))}
+            {errorList
+              .filter((error) => error.timestamp && error.type && error.message) // Filter out logs with no data
+              .map((error, index) => (
+                <tr key={index} className="hover:bg-gray-100">
+                  <td className="border p-2">{error.timestamp}</td>
+                  <td className="border p-2">{error.type}</td>
+                  <td className="border p-2">{error.message}</td>
+                </tr>
+              ))}
           </tbody>
         </table>
       </div>
@@ -311,42 +319,43 @@ return (
             </tr>
           </thead>
           <tbody>
-            {parsedLogs.map((log, index) => (
-              <tr key={index} className="hover:bg-gray-100">
-                <td className="border p-2">{log.timestamp}</td>
-                <td className="border p-2">{log.user || "N/A"}</td>
-                <td className="border p-2">{log.ip || "N/A"}</td>
-                <td className="border p-2">{log.event || "N/A"}</td>
-                <td className="border p-2">
-                  {log.details ? (
-                    <>
-                      <div>Item ID: {log.details.item_id}</div>
-                      <div>Quantity: {log.details.quantity}</div>
-                      <div>Price: {log.details.price}</div>
-                    </>
-                  ) : (
-                    "N/A"
-                  )}
-                </td>
-                <td className="border p-2">
-                  {log.image ? (
-                    <img
-                      src={`data:image/png;base64,${log.image}`}
-                      alt="Device Image"
-                      style={{ maxWidth: "100px", maxHeight: "100px" }}
-                    />
-                  ) : (
-                    "N/A"
-                  )}
-                </td>
-              </tr>
-            ))}
+            {parsedLogs
+              .filter((log) => log.event && log.user) // Example filter to only show logs with an event and user
+              .map((log, index) => (
+                <tr key={index} className="hover:bg-gray-100">
+                  <td className="border p-2">{log.timestamp}</td>
+                  <td className="border p-2">{log.user || "N/A"}</td>
+                  <td className="border p-2">{log.ip || "N/A"}</td>
+                  <td className="border p-2">{log.event || "N/A"}</td>
+                  <td className="border p-2">
+                    {log.details ? (
+                      <>
+                        <div>Item ID: {log.details.item_id}</div>
+                        <div>Quantity: {log.details.quantity}</div>
+                        <div>Price: {log.details.price}</div>
+                      </>
+                    ) : (
+                      "N/A"
+                    )}
+                  </td>
+                  <td className="border p-2">
+                    {log.image ? (
+                      <img
+                        src={`data:image/png;base64,${log.image}`}
+                        alt="Device Image"
+                        style={{ maxWidth: "100px", maxHeight: "100px" }}
+                      />
+                    ) : (
+                      "N/A"
+                    )}
+                  </td>
+                </tr>
+              ))}
           </tbody>
         </table>
       </div>
     </div>
-
-);
+  );
 };
 
 export default IoTLogParser;
