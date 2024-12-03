@@ -35,8 +35,8 @@ Ensure you have the following installed:
 2. Install dependencies:
 
    ```bash
-   npm i
-   npm install recharts
+   npm install
+   npm install react react-dom react-scripts recharts web-vitals
    ```
 
 3. Start the development server:
