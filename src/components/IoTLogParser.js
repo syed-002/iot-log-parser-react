@@ -175,7 +175,7 @@ const IoTLogParser = () => {
       performanceMetrics.failedParse;
 
     return [
-      { name: "Total Logs", value: totalLogs },
+      { name: "Total Parsed Logs", value: totalLogs },
       { name: "Total Errors", value: totalErrors },
     ];
   };
