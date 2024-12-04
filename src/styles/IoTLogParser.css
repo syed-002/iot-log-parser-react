@@ -1,0 +1,151 @@
+/* Left-aligned content */
+.container {
+    text-align: left;
+  }
+  
+  .table th, 
+  .table td {
+    text-align: left;
+    padding: 8px;
+  }
+  
+  .table th {
+    background-color: #f4f4f4;
+  }
+  
+  .tab-content {
+    margin-top: 16px;
+  }
+  
+  .file-upload {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  
+  .file-upload h2 {
+    margin: 0;
+  }
+  
+  .loading-spinner {
+    margin: 16px 0;
+    text-align: center;
+  }
+  
+  /* styles/IoTLogParser.css */
+.dashboard-container {
+    background-color: #f9fafb;
+    min-height: 100vh;
+    padding: 1.5rem;
+  }
+  
+  .dashboard-title {
+    font-size: 1.875rem;
+    font-weight: bold;
+    margin-bottom: 1.5rem;
+    text-align: left;
+    color: #1f2937;
+  }
+  
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  
+  @media (min-width: 768px) {
+    .metrics-grid {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+  
+  .metrics-card {
+    background-color: white;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  }
+  
+  .metrics-card-title {
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+  }
+  
+  .logs-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  
+  .logs-table thead {
+    background-color: #f3f4f6;
+  }
+  
+  .logs-table th,
+  .logs-table td {
+    border: 1px solid #e5e7eb;
+    padding: 0.5rem;
+  }
+  
+  .logs-table tr:hover {
+    background-color: #f9fafb;
+  }
+  
+  .loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: rgba(107, 114, 128, 0.5);
+    z-index: 10;
+  }
+
+  /* Additional styles for visualization section */
+.visualization-container {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 20px;
+    background-color: #f4f4f4;
+  }
+  
+  .chart-card {
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    padding: 20px;
+    width: calc(50% - 10px);
+    max-width: 600px;
+    margin-bottom: 20px;
+    transition: transform 0.3s ease;
+  }
+  
+  .chart-card:hover {
+    transform: scale(1.02);
+  }
+  
+  .chart-title {
+    text-align: center;
+    font-size: 1.2rem;
+    font-weight: bold;
+    margin-bottom: 15px;
+    color: #333;
+  }
+  
+  /* Responsive adjustments */
+  @media (max-width: 1200px) {
+    .chart-card {
+      width: 100%;
+    }
+  }
+
+  .piechart-pie {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+  }

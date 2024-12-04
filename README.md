@@ -37,6 +37,7 @@ Ensure you have the following installed:
    ```bash
    npm install
    npm install react react-dom react-scripts recharts web-vitals
+   npm install @mui/material @emotion/react @emotion/styled
    ```
 
 3. Start the development server:
